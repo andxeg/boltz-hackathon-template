@@ -69,13 +69,16 @@ RUN wget https://d2v9mdonbgo0hk.cloudfront.net/hackathon_data.tar.gz
 RUN mkdir hackathon_data
 RUN tar -xvf hackathon_data.tar.gz -C hackathon_data
 
-## Download LABind weights + models
-# Create directory for checkpoints
+
+## Download LABind weights + models from Google Drive (public file, no auth)
+# Install gdown in the boltz environment
+RUN /opt/conda/bin/conda run -n boltz pip install --no-cache-dir gdown
+
+# Create directory for checkpoints and download from Google Drive using file ID (public)
 RUN mkdir -p hackathon/contrib/checkpoints && \
-    wget -q --show-progress -O /tmp/checkpoints.zip \
-      "https://huggingface.co/achupakhin/boltz_hackathon/resolve/main/checkpoints.zip" && \
-    unzip /tmp/checkpoints.zip -d hackathon/contrib/checkpoints && \
-    rm /tmp/checkpoints.zip
+    /opt/conda/bin/conda run -n boltz gdown --id 1n_2ehtG2lDs2UGIqCwju439M4Geaf4FJ -O /tmp/checkpoints.zip && \
+    unzip -q /tmp/checkpoints.zip -d hackathon/contrib/checkpoints && \
+    rm -f /tmp/checkpoints.zip
 
 
 # Initialize mamba and activate the boltz environment
