@@ -79,7 +79,7 @@ RUN /opt/conda/bin/conda run -n boltz pip install --no-cache-dir gdown
 # Create directory for checkpoints and download from Google Drive
 RUN mkdir -p hackathon/contrib/checkpoints && \
     # /opt/conda/bin/conda run -n boltz gdown --id 1n_2ehtG2lDs2UGIqCwju439M4Geaf4FJ -O /tmp/checkpoints.zip && \ # old link
-    /opt/conda/bin/conda run -n boltz gdown --id 1hEQBQAQiS2dRbMfWivLAQ2AZ80Cc82Fx -O /tmp/checkpoints.zip && \
+    /opt/conda/bin/conda run -n boltz python -m gdown --id 1hEQBQAQiS2dRbMfWivLAQ2AZ80Cc82Fx -O /tmp/checkpoints.zip && \
     unzip -q /tmp/checkpoints.zip -d /tmp && \
     mv /tmp/checkpoints/* hackathon/contrib/checkpoints/ && \
     rm -rf /tmp/checkpoints /tmp/checkpoints.zip
