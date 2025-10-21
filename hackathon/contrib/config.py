@@ -42,8 +42,9 @@ nn_config = {
     'device_ids':[0],
 }
 pretrain_path = { # Please modify 
-    'esmfold_path': './checkpoints/esmfold_v1', # esmfold path
-    'ankh_path': './checkpoints/ankh-large/', # ankh path
-    'molformer_path': './checkpoints/MoLFormer-XL-both-10pct/', # molformer path
+    'esmfold_path': f'{root_path}/checkpoints/esmfold_v1/', # esmfold path
+    'ankh_path': f'{root_path}/checkpoints/ankh-large/', # ankh path
+    'molformer_path': f'{root_path}/checkpoints/MoLFormer-XL-both-10pct/', # molformer path
     'model_path':f'{root_path}/model/Unseen/' # based on Unseen
 }
+
