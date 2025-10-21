@@ -156,6 +156,19 @@ def _contact_residues(structure, cutoff) -> Set[Tuple[str, str, int]]:
             contacts.add((chain, res.get_resname(), res.id[1]))
     return contacts
 
+def _extract_binding_residues(structure, cutoff=4.0) -> Set[Tuple[str, str, int]]:
+    """
+    Extract binding residues (within cutoff distance of ligand) from a structure.
+    
+    Args:
+        structure: BioPython structure object
+        cutoff: Distance cutoff in Angstroms (default 4.0)
+        
+    Returns:
+        Set of tuples (chain_id, resname, residue_number)
+    """
+    return _contact_residues(structure, cutoff)
+
 def _calculate_pocket_rmsd_between_structures(ref_struct, mob_struct, pocket_residues: Set[Tuple[str, str, int]]) -> Optional[float]:
     """Calculate CA-RMSD of pocket residues between two structures."""
     ref_cas = []
@@ -899,10 +912,10 @@ def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str
         else:
             print("WARNING: Could not load unconstrained structures. Skipping ligand RMSD filter.")
     
-    # For allosteric binders, filter structures based on pocket RMSD
+    # For allosteric binders, filter structures based on binding residue comparison
     if is_allosteric and pocket_residues and len(all_pdbs) > 0:
         print(f"\n{'='*80}")
-        print(f"Filtering ALLOSTERIC structures by pocket RMSD")
+        print(f"Filtering ALLOSTERIC structures by binding residue comparison")
         print(f"{'='*80}\n")
         
         # Load all predicted structures
@@ -913,59 +926,63 @@ def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str
             except Exception as e:
                 print(f"WARNING: Could not load {pdb_path}: {e}")
         
-        if len(pred_structs) >= 2:
-            # Use first structure as reference
-            ref_path, ref_struct = pred_structs[0]
+        if len(pred_structs) > 0:
+            # Extract orthosteric residue numbers for comparison
+            orthosteric_residue_ids = {(chain, resi) for chain, resn, resi in pocket_residues}
             
-            # Superpose all structures to reference
-            for _, struct in pred_structs[1:]:
-                _superpose_structure(ref_struct, struct)
-            
-            # Calculate pocket RMSD and filter
-            print(f"Pocket RMSD analysis for allosteric predictions ({len(pocket_residues)} pocket residues):")
-            print(f"{'Model':<40} {'Pocket RMSD (Å)':<18} {'Status':<20}")
-            print("-" * 80)
+            # Analyze binding residues and filter
+            print(f"Binding residue analysis for allosteric predictions:")
+            print(f"Orthosteric pocket has {len(pocket_residues)} residues (within {CONTACT_CUTOFF} Å)")
+            print(f"\n{'Model':<40} {'Binding Res':<12} {'Overlap':<12} {'Overlap %':<12} {'Status':<20}")
+            print("-" * 100)
             
             filtered_pdbs = []
-            unfiltered_pdbs = []
             
             for pdb_path, struct in pred_structs:
-                if pdb_path == ref_path:
-                    rmsd = 0.0  # Reference to itself
-                else:
-                    rmsd = _calculate_pocket_rmsd_between_structures(ref_struct, struct, pocket_residues)
-                
-                if rmsd is not None:
-                    # For allosteric binders, we want RMSD > 4A (far from orthosteric pocket)
-                    if rmsd > 4.0:
-                        status = "PASS (> 4 Å)"
-                        filtered_pdbs.append(pdb_path)
+                try:
+                    # Extract binding residues (within 4Å of ligand) from this structure
+                    binding_residues = _extract_binding_residues(struct, cutoff=4.0)
+                    
+                    if binding_residues:
+                        # Compare with orthosteric pocket
+                        binding_residue_ids = {(chain, resi) for chain, resn, resi in binding_residues}
+                        overlap = binding_residue_ids & orthosteric_residue_ids
+                        overlap_count = len(overlap)
+                        overlap_pct = (overlap_count / len(orthosteric_residue_ids)) * 100 if len(orthosteric_residue_ids) > 0 else 0
+                        
+                        # For allosteric binders, we want LOW overlap with orthosteric pocket
+                        # Filter out structures with >50% overlap
+                        if overlap_pct <= 50.0:
+                            status = "PASS (≤50% overlap)"
+                            filtered_pdbs.append(pdb_path)
+                        else:
+                            status = "FILTERED (>50% overlap)"
+                        
+                        print(f"{pdb_path.name:<40} {len(binding_residues):<12} {overlap_count:<12} {overlap_pct:<12.1f} {status}")
                     else:
-                        status = "FILTERED (≤ 4 Å)"
-                    unfiltered_pdbs.append(pdb_path)
-                    print(f"{pdb_path.name:<40} {rmsd:>8.2f}             {status}")
-                else:
-                    # If can't calculate, keep it
-                    print(f"{pdb_path.name:<40} {'N/A':>8}             PASS (cannot calc)")
-                    filtered_pdbs.append(pdb_path)
-                    unfiltered_pdbs.append(pdb_path)
+                        # No binding residues found, keep it anyway
+                        print(f"{pdb_path.name:<40} {'0':<12} {'N/A':<12} {'N/A':<12} PASS (no binding res)")
+                        filtered_pdbs.append(pdb_path)
+                        
+                except Exception as e:
+                    print(f"WARNING: Could not process {pdb_path}: {e}")
+                    filtered_pdbs.append(pdb_path)  # Keep on error
             
-            print("-" * 80)
-            print(f"Filtered structures (RMSD > 4 Å from orthosteric pocket): {len(filtered_pdbs)}/{len(pred_structs)}")
+            print("-" * 100)
+            print(f"Filtered structures (≤50% overlap with orthosteric pocket): {len(filtered_pdbs)}/{len(pred_structs)}")
             
             # If all structures filtered out, use unfiltered set
             if len(filtered_pdbs) == 0:
-                print("WARNING: All structures filtered out. Using unfiltered set.")
-                all_pdbs = sorted(unfiltered_pdbs)
+                print("WARNING: All structures filtered out by binding residue comparison. Using unfiltered set.")
             else:
-                print(f"Using {len(filtered_pdbs)} structures that pass RMSD > 4 Å filter")
+                print(f"Using {len(filtered_pdbs)} structures that pass binding residue filter")
                 all_pdbs = sorted(filtered_pdbs)
             print()
     
-    # Calculate pocket RMSD for unconstrained structures if available (for reference)
+    # Analyze binding residues for unconstrained structures if available (for reference)
     if pocket_residues and unconstrained_dir and unconstrained_dir.exists():
         print(f"\n{'='*80}")
-        print(f"Computing pocket RMSD for unconstrained structures (reference)")
+        print(f"Binding residue analysis for unconstrained structures (reference)")
         print(f"{'='*80}\n")
         
         unconstrained_paths = [unconstrained_dir / f"model_{i}.pdb" for i in range(5)]
@@ -973,43 +990,47 @@ def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str
         
         for path in unconstrained_paths:
             if path.exists():
-                unconstrained_structs.append(_load_structure(path))
+                try:
+                    unconstrained_structs.append((path, _load_structure(path)))
+                except Exception as e:
+                    print(f"WARNING: Could not load {path}: {e}")
         
-        if len(unconstrained_structs) >= 2:
-            # Use first structure as reference
-            ref_struct = unconstrained_structs[0]
+        if len(unconstrained_structs) > 0:
+            # Extract orthosteric residue numbers for comparison
+            orthosteric_residue_ids = {(chain, resi) for chain, resn, resi in pocket_residues}
             
-            # Superpose all structures to reference
-            for s in unconstrained_structs[1:]:
-                _superpose_structure(ref_struct, s)
+            # Analyze binding residues for each unconstrained structure
+            print(f"Orthosteric pocket has {len(pocket_residues)} residues (within {CONTACT_CUTOFF} Å)")
+            print(f"\n{'Model':<12} {'Binding Res':<12} {'Overlap':<12} {'Overlap %':<12} {'Note':<30}")
+            print("-" * 80)
             
-            # Calculate pocket RMSD for each structure
-            print(f"Pocket RMSD analysis (relative to model_0, {len(pocket_residues)} pocket residues):")
-            print(f"{'Model':<12} {'Pocket RMSD (Å)':<18} {'Status':<20}")
-            print("-" * 50)
+            overlaps = []
+            for path, struct in unconstrained_structs:
+                try:
+                    # Extract binding residues (within 4Å of ligand)
+                    binding_residues = _extract_binding_residues(struct, cutoff=4.0)
+                    
+                    if binding_residues:
+                        # Compare with orthosteric pocket
+                        binding_residue_ids = {(chain, resi) for chain, resn, resi in binding_residues}
+                        overlap = binding_residue_ids & orthosteric_residue_ids
+                        overlap_count = len(overlap)
+                        overlap_pct = (overlap_count / len(orthosteric_residue_ids)) * 100 if len(orthosteric_residue_ids) > 0 else 0
+                        overlaps.append(overlap_pct)
+                        
+                        note = "High orthosteric overlap" if overlap_pct > 50 else "Low orthosteric overlap"
+                        print(f"{path.name:<12} {len(binding_residues):<12} {overlap_count:<12} {overlap_pct:<12.1f} {note}")
+                    else:
+                        print(f"{path.name:<12} {'0':<12} {'N/A':<12} {'N/A':<12} No binding residues found")
+                        
+                except Exception as e:
+                    print(f"WARNING: Could not process {path.name}: {e}")
             
-            rmsds = []
-            for i, struct in enumerate(unconstrained_structs):
-                if i == 0:
-                    rmsd = 0.0  # Reference to itself
-                else:
-                    rmsd = _calculate_pocket_rmsd_between_structures(ref_struct, struct, pocket_residues)
-                
-                if rmsd is not None:
-                    status = "RMSD > 4 Å" if rmsd > 4.0 else "RMSD ≤ 4 Å"
-                    rmsds.append(rmsd)
-                    print(f"model_{i:<6} {rmsd:>8.2f}             {status}")
-                else:
-                    print(f"model_{i:<6} {'N/A':>8}             Could not calculate")
-            
-            if rmsds:
-                avg_rmsd = np.mean(rmsds[1:]) if len(rmsds) > 1 else 0.0  # Exclude reference
-                print("-" * 50)
-                print(f"Average pocket RMSD (excluding reference): {avg_rmsd:.2f} Å")
-                
-                high_rmsd_count = sum(1 for r in rmsds[1:] if r > 4.0)
-                if high_rmsd_count > 0:
-                    print(f"Number of structures with pocket RMSD > 4 Å: {high_rmsd_count}/{len(rmsds)-1}")
+            if overlaps:
+                avg_overlap = np.mean(overlaps)
+                print("-" * 80)
+                print(f"Average overlap with orthosteric pocket: {avg_overlap:.1f}%")
+                print(f"Expected: High overlap for orthosteric, low overlap for allosteric")
             print()
     
     # Rank structures by ligand iPTM scores
