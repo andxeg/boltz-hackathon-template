@@ -404,3 +404,4 @@ print(f"\nKey findings:")
 print(f"  - Analyzed {len(df)} complexes (20 orthosteric, 20 allosteric)")
 print(f"  - Each complex has 5 model predictions aggregated")
 
+
