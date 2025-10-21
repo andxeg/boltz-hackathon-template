@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   build-essential \
   python3-dev \
+  unzip \
   && apt-get autoremove -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -63,8 +64,19 @@ RUN chown -R $USERNAME:$USERNAME /app
 
 USER $USERNAME
 
+## Download hackathon_data
+RUN wget https://d2v9mdonbgo0hk.cloudfront.net/hackathon_data.tar.gz
+RUN mkdir hackathon_data
+RUN tar -xvf hackathon_data.tar.gz -C hackathon_data
 
-## Add download step for LABind weights + models
+## Download LABind weights + models
+# Create directory for checkpoints
+RUN mkdir -p hackathon/contrib/checkpoints && \
+    wget -q --show-progress -O /tmp/checkpoints.zip \
+      "https://huggingface.co/achupakhin/boltz_hackathon/resolve/main/checkpoints.zip" && \
+    unzip /tmp/checkpoints.zip -d hackathon/contrib/checkpoints && \
+    rm /tmp/checkpoints.zip
+
 
 # Initialize mamba and activate the boltz environment
 SHELL ["/bin/bash", "-c"]
