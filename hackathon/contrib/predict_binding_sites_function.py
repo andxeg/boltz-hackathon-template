@@ -88,9 +88,6 @@ def predict_binding_sites_from_text(
         with open(smiles_file, 'w') as f:
             f.write(f"{ligand_id} {smiles}\n")
         
-        # Download weights if needed
-        download_all_weights(pretrain_path=pretrain_path)
-        
         # Set up device
         run_device = f'cuda:{device_ids[0]}' if torch.cuda.is_available() else 'cpu'
         
