@@ -76,11 +76,9 @@ RUN tar -xvf hackathon_data.tar.gz -C hackathon_data
 # Install gdown in the boltz environment
 RUN /opt/conda/bin/conda run -n boltz pip install --no-cache-dir gdown
 
-
-# Create directory for checkpoints and download from Google Drive using file ID (public)
+# Create directory for checkpoints and download from Google Drive
 RUN mkdir -p hackathon/contrib/checkpoints && \
-    # /opt/conda/bin/conda run -n boltz gdown --id 1n_2ehtG2lDs2UGIqCwju439M4Geaf4FJ -O /tmp/checkpoints.zip && \
-    /opt/conda/bin/conda run -n boltz python -m gdown --id 1bUiE2swDozMMe8O6SJVxketUHuWTaC6_ -O /tmp/checkpoints.zip && \
+    /opt/conda/bin/conda run -n boltz gdown --id 1n_2ehtG2lDs2UGIqCwju439M4Geaf4FJ -O /tmp/checkpoints.zip && \
     unzip -q /tmp/checkpoints.zip -d /tmp && \
     mv /tmp/checkpoints/* hackathon/contrib/checkpoints/ && \
     rm -rf /tmp/checkpoints /tmp/checkpoints.zip
