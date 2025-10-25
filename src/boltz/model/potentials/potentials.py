@@ -824,11 +824,11 @@ def get_potentials(steering_args, boltz2=False):
                 ),
                 RepulsionContactPotential(
                     parameters={
-                        "guidance_interval": 1,  # Apply more frequently
+                        "guidance_interval": 4,  # Apply more frequently
                         "guidance_weight": (
                             PiecewiseStepFunction(
                                 # Reverse schedule: strong early (t=1.0), weaker late (t=0.0)
-                                thresholds=[0.25, 0.75], values=[50.0, 75.0, 100.0]
+                                thresholds=[0.25, 0.75], values=[5.0, 7.5, 10.0]
                             )
                             if steering_args["contact_guidance_update"]
                             else 0.0

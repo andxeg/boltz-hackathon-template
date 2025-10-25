@@ -57,11 +57,11 @@ LIGAND_IPTM_STD_THRESHOLD = 0.01
 LIGAND_SIMILARITY_THRESHOLD = 0.80  # 80% Tanimoto similarity
 
 # Binding site prediction parameters
-TOP_N_BINDING_PREDICTIONS = 15  # Number of top binding site predictions to use
-BINDING_PROBABILITY_THRESHOLD = 0.7  # Minimum binding probability threshold
+TOP_N_BINDING_PREDICTIONS = 5  # Number of top binding site predictions to use
+BINDING_PROBABILITY_THRESHOLD = 0.5  # Minimum binding probability threshold
 
 # Constraint distance parameters
-NEGATIVE_POCKET_MIN_DISTANCE = 10.0  # Minimum distance (Å) for negative_pocket constraint (allosteric)
+NEGATIVE_POCKET_MIN_DISTANCE = 5.0  # Minimum distance (Å) for negative_pocket constraint (allosteric)
 POCKET_MAX_DISTANCE = 4.0  # Maximum distance (Å) for pocket constraint
 
 2# Cache for reference allosteric ligands
@@ -653,7 +653,7 @@ def prepare_protein_complex(datapoint_id: str, proteins: List[Protein], input_di
     print(pockets)
 
     # Example: predict 5 structures
-    cli_args = ["--diffusion_samples", "5", "--use_potentials"]
+    cli_args = ["--diffusion_samples", "10", "--use_potentials"]
     return [(input_dict, cli_args)]
 
 def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[SmallMolecule], input_dict: dict, msa_dir: Optional[Path] = None, pocket_residues: Optional[Set[Tuple[str, str, int]]] = None, is_allosteric: bool = False) -> List[tuple[dict, List[str]]]:
@@ -756,7 +756,7 @@ def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[Sm
     # `ligands` contains a single small molecule ligand object with unknown binding sites
     # The binding site prediction results have been used to add pocket constraints to input_dict
 
-    cli_args = ["--diffusion_samples", "10", "--sampling_steps", "300", "--use_potentials"]
+    cli_args = ["--diffusion_samples", "5", "--use_potentials"]
     return [(input_dict, cli_args)]
 
 def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]], prediction_dirs: List[Path]) -> List[Path]:
@@ -972,7 +972,7 @@ ap.add_argument("--group-id", type=str, required=False, default=None,
                 help="Group ID to set for submission directory (sets group rw access if specified)")
 ap.add_argument("--result-folder", type=Path, required=False, default=None,
                 help="Directory to save evaluation results. If set, will automatically run evaluation after predictions.")
-ap.add_argument("--use-auto-pocket-scanner", action="store_true", default=True,
+ap.add_argument("--use-auto-pocket-scanner", action="store_true", default=False,
                 help="Use automatic pocket scanning (binding site prediction) to add constraints (default: True)")
 
 args = ap.parse_args()
